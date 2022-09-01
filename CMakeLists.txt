@@ -9,6 +9,8 @@ project(storing_groceries)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
   rospy
+  roslib
+  std_msgs
 )
 
 ## System dependencies are found with CMake's conventions
