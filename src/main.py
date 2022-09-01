@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #----------------------------------------------------------
 # Title: Storing Groceriesのマスターノード
@@ -13,6 +13,7 @@ import actionlib
 import smach
 import smach_ros
 
+#メッセージの方で使用
 from std_msgs.msg import String, Float64
 #認識関係
 from happymimi_recognition_msg.srv import RcognitionList
@@ -70,6 +71,7 @@ class ShelfCheck(smach.State):
         self.head_pub = rospy.Publisher('/servo/head', Float64, queue_size = 1 )
 
         # Service
+        # 物体の一覧を取得する（list型）
         self.recognition_srv = rospy.ServiceProxy('/recognition/list', RecognitionList)
         self.grasp_srv = rospy.ServiceProxy('/recognition_to_grasping', RecognitionToGrasping)
         self.arm_srv = rospy.ServiceProxy('/servo/arm', StrTrg)
@@ -84,18 +86,36 @@ class ShelfCheck(smach.State):
                               "2段":["bottle", "snack"],
                               "3段":["big bottle", "any"]]
         '''
-        self.shelf_result = []
+        self.shelf_result = ["1":"NULL", "2":"NULL", "3":"NULL"]
 
 
     def execute(self, userdata):
         rospy.loginfo("Executing state: SHELF_CHECK")
         tts.srv("Check the contents of the shelf.")
-
+        
+        '''
         # 頭部を可動（角度の数値は要調整!）
         self.head_pub.publish(25.0)
         rospy.sleep(2.0)
         self.shelf_result = self.recog_srv('cup','left')
         # 上を動作を頭部(カメラ)の角度を調整しながら繰り返す...
+        '''
+        #↓最適化したいよね...
+        
+        #１段目（下からカウント）
+        self.head_pub.publish(15.0)
+        rospy.sleep(2.0)
+        self.shelf_result["1"] = (self.recognition_srv('','left'))
+
+        #2段目（下からカウント）
+        self.head_pub.publish(-15.0)
+        rospy.sleep(2.0)
+        self.shelf_result["2"] = (self.recognition_srv('','left'))
+
+        #3段目（下からカウント）
+        self.head_pub.publish(-10.0)
+        rospy.sleep(2.0)
+        self.shelf_result["3"] = (self.recognition_srv('','left'))
 
         print(self.shelf_result)
         return 'success'
@@ -110,6 +130,7 @@ class PickandPlace(smach.State):
                                            'cmd_in_data'])
 
         #Service
+        self.recognition_srv = rospy.ServiceProxy('/recognition/list', RecognitionList)
         self.grasp_srv = rospy.ServiceProxy('/recognition_to_grasping', RecognitionToGrasping)
         self.arm_srv = rospy.ServiceProxy('/servo/arm', StrTrg)
 
@@ -120,10 +141,15 @@ class PickandPlace(smach.State):
 
     def execute(self, userdata):
         rospy.loginfo("Executing state: PickandPlace")
+        tts_srv("Moving TallTable")
         
         #テーブルへの移動
         self.navi_srv('Tall table')
-        
+
+        #テーブル上の物体の一覧を取得(左からソート)
+        self.table_result.append(self.recognition_srv("any", left))
+        #物体の把持（左側の物体から）
+        self.
 
 
 if __name__ == '__main__':
