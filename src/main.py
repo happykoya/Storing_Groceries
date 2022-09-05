@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 #----------------------------------------------------------
 # Title: Storing Groceriesのマスターノード
-# Author: Koya Okuse　Akihiko Nshijima
-# Date: 2022/08/05 ~ 
+# Author: Koya Okuse　Akihiko Nshijima　Takumi Nozaki
+# Date: 2022/08/05 ~
 # Memo: 競技内容はStoring Groceries
 #----------------------------------------------------------
 import sys
@@ -13,29 +13,30 @@ import actionlib
 import smach
 import smach_ros
 
-#メッセージの方で使用
+# メッセージの方で使用
 from std_msgs.msg import String, Float64
-#認識関係
-from happymimi_recognition_msg.srv import RcognitionList
-#ナビゲーション&Enter Room
+# 認識関係
+from happymimi_recognition_msg.srv import RecognitionList
+# ナビゲーション&Enter Room
 from happymimi_navigation.srv import NaviLocation
 from enter_room.srv import EnterRoom
-#音声関係
+# 音声関係
 from happymimi_voice_msgs.srv import TTS, YesNo, StrTrg
-#マニピュレーション
-from happymimi_manipulation_msgs.srv import RecognitionToGrasping, RcognitionToGraspingRequest
-#いるかわからない...
+# マニピュレーション
+from happymimi_manipulation_msgs.srv import RecognitionToGrasping, RecognitionToGraspingRequest
+# いるかわからない...
 from base_control import BaseControl
 
 
 # tts_srv
 tts_srv = rospy.ServiceProxy('/tts', StrTrg)
 
-#部屋の中へ移動
+
+# 部屋の中へ移動
 class Enter(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes = ['enter_finish'])
-        
+
         # Service
         self.enter_srv = rospy.ServiceProxy('enter_room_server', EnterRoom)
 
@@ -45,13 +46,14 @@ class Enter(smach.State):
         self.enter_srv(distance=0.8, velocity=0.2)
         return 'enter_finish'
 
-#棚への移動
+
+# 棚への移動
 class MoveShelf(smach.State):
     def __init__(self):
-        smach.State.__init__(self,outcomes = ['moved_shelf'])
+        smach.State.__init__(self, outcomes = ['moved_shelf'])
 
         # Service
-        self.navi_srv = rospy.ServicePrixy ('/navi_location_server', NaviLocation)
+        self.navi_srv = rospy.ServiceProxy ('/navi_location_server', NaviLocation)
         
     def execute(self, userdata):
         rospy.loginfo('Executing state: MOVESHELF')
@@ -59,11 +61,12 @@ class MoveShelf(smach.State):
         self.navi_srv('shelf')
         return 'moved_shelf'
 
-#棚の中身の確認
+
+# 棚の中身の確認
 class ShelfCheck(smach.State):
     def __init__(self):
         smach.State.__init__(self,
-                             outcomes = ['check_success','check_failure'],
+                             outcomes = ['check_success', 'check_failure'],
                              input_keys = ['object_name_in'],
                              output_keys = ['object_name_out'])
         
@@ -80,42 +83,40 @@ class ShelfCheck(smach.State):
         self.bc = BaseControl()
         self.rotate = 90
 
-        #棚の中の物体を格納(2重リストにする？)
+        # 棚の中の物体を格納(2重リストにする？)
         '''
-        理想: recog_result = ["1段":["cup","cup"],
+        理想: recog_result = ["1段":["cup", "cup"],
                               "2段":["bottle", "snack"],
                               "3段":["big bottle", "any"]]
         '''
-        self.shelf_result = ["1":"NULL", "2":"NULL", "3":"NULL"]
-
+        self.shelf_result = {"1":"NULL", "2":"NULL", "3":"NULL"}
 
     def execute(self, userdata):
         rospy.loginfo("Executing state: SHELF_CHECK")
         tts.srv("Check the contents of the shelf.")
-        
-        '''
         # 頭部を可動（角度の数値は要調整!）
+        '''
         self.head_pub.publish(25.0)
         rospy.sleep(2.0)
         self.shelf_result = self.recog_srv('cup','left')
-        # 上を動作を頭部(カメラ)の角度を調整しながら繰り返す...
         '''
-        #↓最適化したいよね...
-        
-        #１段目（下からカウント）
+        # 上を動作を頭部(カメラ)の角度を調整しながら繰り返す...
+        # ↓最適化したいよね...
+
+        # 1段目（下からカウント）
         self.head_pub.publish(15.0)
         rospy.sleep(2.0)
-        self.shelf_result["1"] = (self.recognition_srv('','left'))
+        self.shelf_result["1"] = (self.recognition_srv('', 'left'))
 
-        #2段目（下からカウント）
+        # 2段目（下からカウント）
         self.head_pub.publish(-15.0)
         rospy.sleep(2.0)
-        self.shelf_result["2"] = (self.recognition_srv('','left'))
+        self.shelf_result["2"] = (self.recognition_srv('', 'left'))
 
-        #3段目（下からカウント）
+        # 3段目（下からカウント）
         self.head_pub.publish(-10.0)
         rospy.sleep(2.0)
-        self.shelf_result["3"] = (self.recognition_srv('','left'))
+        self.shelf_result["3"] = (self.recognition_srv('', 'left'))
 
         print(self.shelf_result)
         return 'success'
@@ -129,7 +130,7 @@ class PickandPlace(smach.State):
                              input_keys = ['cmd_in_action',
                                            'cmd_in_data'])
 
-        #Service
+        # Service
         self.recognition_srv = rospy.ServiceProxy('/recognition/list', RecognitionList)
         self.grasp_srv = rospy.ServiceProxy('/recognition_to_grasping', RecognitionToGrasping)
         self.arm_srv = rospy.ServiceProxy('/servo/arm', StrTrg)
@@ -138,17 +139,16 @@ class PickandPlace(smach.State):
         # テーブル上の物体を格納
         self.table_result = []
 
-
     def execute(self, userdata):
         rospy.loginfo("Executing state: PickandPlace")
         tts_srv("Moving TallTable")
-        
-        #テーブルへの移動
+
+        # テーブルへの移動
         self.navi_srv('Tall table')
 
-        #テーブル上の物体の一覧を取得(左からソート)
-        self.table_result.append(self.recognition_srv("any", left))
-        #物体の把持（左側の物体から）
+        # テーブル上の物体の一覧を取得(左からソート)
+        self.table_result.append(self.recognition_srv("any", 'left'))
+        # 物体の把持（左側の物体から）
         self.
 
 
@@ -170,7 +170,7 @@ if __name__ == '__main__':
 
         smach.StateMachine.add(
                 'SHELF_CHECK',
-                ListenCommand(),
+                ShelfCheck(),
                 transitions = {'check_success':'PICKANDPLACE',
                                'check_failure':'SHELF_CHECK'},
                 remapping = {'cmd_out_action':'ap_action',
@@ -180,7 +180,7 @@ if __name__ == '__main__':
 
         smach.StateMachine.add(
                 'PICKANDPLACE',
-                ExeAction(),
+                PickandPlace(),
                 transitions = {'place_success':'SHELF_CHECK',
                                'place_failure':'SHELF_CHECK'},
                 remapping = {'cmd_in_action':'ap_action',
