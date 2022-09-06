@@ -53,11 +53,11 @@ class MoveShelf(smach.State):
         smach.State.__init__(self, outcomes = ['moved_shelf'])
 
         # Service
-        self.navi_srv = rospy.ServiceProxy ('/navi_location_server', NaviLocation)
+        self.navi_srv = rospy.ServiceProxy('/navi_location_server', NaviLocation)
         
     def execute(self, userdata):
         rospy.loginfo('Executing state: MOVESHELF')
-        tts.srv("Move to the shelf")
+        tts_srv("Move to the shelf")
         self.navi_srv('shelf')
         return 'moved_shelf'
 
@@ -71,7 +71,7 @@ class ShelfCheck(smach.State):
                              output_keys = ['object_name_out'])
         
         # Publisher
-        self.head_pub = rospy.Publisher('/servo/head', Float64, queue_size = 1 )
+        self.head_pub = rospy.Publisher('/servo/head', Float64, queue_size = 1)
 
         # Service
         # 物体の一覧を取得する（list型）
@@ -82,18 +82,19 @@ class ShelfCheck(smach.State):
         # Variable
         self.bc = BaseControl()
         self.rotate = 90
+        self.all_object = ['cup', 'bottle']
 
         # 棚の中の物体を格納(2重リストにする？)
         '''
-        理想: recog_result = ["1段":["cup", "cup"],
+        理想: recog_result = {"1段":["cup", "cup"],
                               "2段":["bottle", "snack"],
-                              "3段":["big bottle", "any"]]
+                              "3段":["big bottle", "any"]}
         '''
-        self.shelf_result = {"1":"NULL", "2":"NULL", "3":"NULL"}
+        self.shelf_result = {1:[], 2:[], 3:[]}
 
     def execute(self, userdata):
         rospy.loginfo("Executing state: SHELF_CHECK")
-        tts.srv("Check the contents of the shelf.")
+        tts_srv("Check the contents of the shelf.")
         # 頭部を可動（角度の数値は要調整!）
         '''
         self.head_pub.publish(25.0)
@@ -104,19 +105,11 @@ class ShelfCheck(smach.State):
         # ↓最適化したいよね...
 
         # 1段目（下からカウント）
-        self.head_pub.publish(15.0)
-        rospy.sleep(2.0)
-        self.shelf_result["1"] = (self.recognition_srv('', 'left'))
-
-        # 2段目（下からカウント）
-        self.head_pub.publish(-15.0)
-        rospy.sleep(2.0)
-        self.shelf_result["2"] = (self.recognition_srv('', 'left'))
-
-        # 3段目（下からカウント）
-        self.head_pub.publish(-10.0)
-        rospy.sleep(2.0)
-        self.shelf_result["3"] = (self.recognition_srv('', 'left'))
+        head_angles = [15.0, -15.0, -10.0]
+        for i in range(3):
+            self.head_pub.publish(head_angles[i])
+            rospy.sleep(2.0)
+            self.shelf_result[i + 1] = self.recognition_srv('any', 'left').object_list
 
         print(self.shelf_result)
         return 'success'
@@ -147,9 +140,11 @@ class PickandPlace(smach.State):
         self.navi_srv('Tall table')
 
         # テーブル上の物体の一覧を取得(左からソート)
-        self.table_result.append(self.recognition_srv("any", 'left'))
+        self.table_result = self.recognition_srv('any', 'left').object_list
         # 物体の把持（左側の物体から）
-        self.
+        if self.grasp_srv(self.table_result[0]):
+            return 'action_success'
+        return 'action_failure'
 
 
 if __name__ == '__main__':
