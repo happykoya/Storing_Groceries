@@ -118,8 +118,8 @@ class ShelfCheck(smach.State):
 class PickandPlace(smach.State):
     def __init__(self):
         smach.State.__init__(self,
-                             outcomes = ['action_success',
-                                         'action_failure'],
+                             outcomes = ['place_success',
+                                         'place_failure'],
                              input_keys = ['cmd_in_action',
                                            'cmd_in_data'])
 
@@ -167,6 +167,7 @@ if __name__ == '__main__':
                 'SHELF_CHECK',
                 ShelfCheck(),
                 transitions = {'check_success':'PICKANDPLACE',
+                            　 'non_something':'EXITROOM'
                                'check_failure':'SHELF_CHECK'},
                 remapping = {'cmd_out_action':'ap_action',
                              'cmd_out_data':'ap_data',
@@ -180,5 +181,7 @@ if __name__ == '__main__':
                                'place_failure':'SHELF_CHECK'},
                 remapping = {'cmd_in_action':'ap_action',
                              'cmd_in_data':'ap_data'})
+
+        smach.StateMachine.add('Exit',Exit(),transitions = {'to_finish':finish_sm})
 
     outcome = sm_top.execute()
