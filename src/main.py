@@ -146,6 +146,13 @@ class PickandPlace(smach.State):
             return 'action_success'
         return 'action_failure'
 
+    
+class Exit(smach.State):
+    def __init__(self):
+        smach.State.__init__(self,
+                             outcomes = ['exit_finish'])
+        
+    def execute(self, userdata):
 
 if __name__ == '__main__':
     rospy.init_node('storing_groceries')
@@ -167,7 +174,7 @@ if __name__ == '__main__':
                 'SHELF_CHECK',
                 ShelfCheck(),
                 transitions = {'check_success':'PICKANDPLACE',
-                            　 'non_something':'EXITROOM'
+                            　 'non_something':'EXIT'
                                'check_failure':'SHELF_CHECK'},
                 remapping = {'cmd_out_action':'ap_action',
                              'cmd_out_data':'ap_data',
@@ -182,6 +189,11 @@ if __name__ == '__main__':
                 remapping = {'cmd_in_action':'ap_action',
                              'cmd_in_data':'ap_data'})
 
-        smach.StateMachine.add('Exit',Exit(),transitions = {'to_finish':finish_sm})
+        smach.StateMachine.add(
+                'EXIT',
+                Exit(),
+                transitions = {'to_finish':finish_sm})
 
     outcome = sm_top.execute()
+
+    
